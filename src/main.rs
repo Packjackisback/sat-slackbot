@@ -1,90 +1,33 @@
-use serde::{Deserialize, Serialize};
 use anyhow::Result;
-
-#[derive(Debug, Serialize, Deserialize, Default)]
-struct Visuals {
-    #[serde(rename = "type")]
-    #[serde(default = "default_null_string")]
-    visual_type: String,
-    #[serde(default = "default_null_string")]
-    svg_content: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Question {
-    #[serde(default = "default_null_string")]
-    paragraph: String,
-    question: String,
-    choices: Choices,
-    correct_answer: String,
-    explanation: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Choices {
-    A: String,
-    B: String,
-    C: String,
-    D: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct SATQuestion {
-    id: String,
-    domain: String,
-    #[serde(default)]
-    visuals: Visuals,
-    question: Question,
-    difficulty: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct MathResponse {
-    math: Vec<SATQuestion>,
-}
-
-fn default_null_string() -> String {
-    "null".to_string()
-}
+use axum::{
+    routing::post,
+    Router,
+};
+use std::net::SocketAddr;
+use tower_http::trace::TraceLayer;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use dotenv::dotenv;
+use slack_sat_bot::handlers::{handle_slash_command, handle_interaction};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Create an HTTP client
-    let client = reqwest::Client::new();
+    dotenv().ok();
 
-    // Fetch SAT questions from JSON Silo API
-    let response = client
-        .get("https://api.jsonsilo.com/public/942c3c3b-3a0c-4be3-81c2-12029def19f5")
-        .send()
-        .await?;
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::new(
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into()),
+        ))
+        .with(tracing_subscriber::fmt::layer())
+        .init();
 
-    if response.status().is_success() {
-        let data: MathResponse = response.json().await?;
-        
-        // Print each math question
-        for (index, question) in data.math.iter().enumerate() {
-            println!("\nQuestion #{}", index + 1);
-            println!("ID: {}", question.id);
-            println!("Domain: {}", question.domain);
-            println!("Difficulty: {}", question.difficulty);
-            println!("Question: {}", question.question.question);
-            
-            if question.question.paragraph != "null" {
-                println!("\nParagraph: {}", question.question.paragraph);
-            }
-            
-            println!("\nChoices:");
-            println!("A) {}", question.question.choices.A);
-            println!("B) {}", question.question.choices.B);
-            println!("C) {}", question.question.choices.C);
-            println!("D) {}", question.question.choices.D);
-            println!("\nCorrect Answer: {}", question.question.correct_answer);
-            println!("\nExplanation: {}", question.question.explanation);
-            println!("\n{}", "-".repeat(80));
-        }
-    } else {
-        println!("Error: {}", response.status());
-    }
+    let app = Router::new()
+        .route("/slack/commands", post(handle_slash_command))
+        .route("/slack/interactions", post(handle_interaction))
+        .layer(TraceLayer::new_for_http());
+
+    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    tracing::info!("listening on {}", addr);
+    axum::serve(tokio::net::TcpListener::bind(addr).await?, app).await?;
 
     Ok(())
 } 

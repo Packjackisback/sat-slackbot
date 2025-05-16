@@ -1,0 +1,1 @@
+/home/packjack/Projects/slack-sat-bot/target/debug/libslack_sat_bot.rlib: /home/packjack/Projects/slack-sat-bot/src/handlers.rs /home/packjack/Projects/slack-sat-bot/src/lib.rs /home/packjack/Projects/slack-sat-bot/src/models.rs /home/packjack/Projects/slack-sat-bot/src/slack.rs /home/packjack/Projects/slack-sat-bot/src/utils.rs

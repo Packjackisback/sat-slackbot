@@ -1,0 +1,1 @@
+hyper_util::server::conn::auto::UpgradeableConnection<'_, tokio::net::TcpStream, IntoMakeService<Router>, TokioExecutor>
